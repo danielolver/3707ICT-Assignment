@@ -1,0 +1,76 @@
+{
+  "version": 1,
+  "author": "3707ICT Smart Home Group",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "board-esp32-devkit-c-v4", "id": "esp", "top": 0, "left": 0, "attrs": {} },
+    {
+      "type": "wokwi-dht22",
+      "id": "dht",
+      "top": -120,
+      "left": -210,
+      "attrs": { "temperature": "24", "humidity": "50" }
+    },
+    { "type": "wokwi-pir-motion-sensor", "id": "pir", "top": 71.2, "left": -256.98, "attrs": {} },
+    {
+      "type": "wokwi-photoresistor-sensor",
+      "id": "ldr",
+      "top": 243.2,
+      "left": -248.8,
+      "attrs": { "lux": "500" }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "lightLed",
+      "top": -138,
+      "left": 167,
+      "attrs": { "color": "yellow", "label": "ROOM LIGHT" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "lightResistor",
+      "top": -52.8,
+      "left": 229.85,
+      "rotate": 90,
+      "attrs": { "value": "220" }
+    },
+    {
+      "type": "wokwi-relay-module",
+      "id": "relay",
+      "top": 125,
+      "left": 345.6,
+      "attrs": { "label": "CLIMATE", "transistor": "pnp" }
+    },
+    {
+      "type": "wokwi-servo",
+      "id": "servo",
+      "top": 266.8,
+      "left": 240,
+      "attrs": { "horn": "single", "label": "BLINDS" }
+    }
+  ],
+  "connections": [
+    [ "dht:VCC", "esp:3V3", "red", [ "v0" ] ],
+    [ "dht:SDA", "esp:15", "green", [ "v0" ] ],
+    [ "dht:GND", "esp:GND.1", "black", [ "v0" ] ],
+    [ "pir:VCC", "esp:5V", "red", [ "v0" ] ],
+    [ "pir:OUT", "esp:27", "green", [ "v0" ] ],
+    [ "pir:GND", "esp:GND.1", "black", [ "v0" ] ],
+    [ "ldr:VCC", "esp:3V3", "red", [ "v0" ] ],
+    [ "ldr:AO", "esp:34", "green", [ "v0" ] ],
+    [ "ldr:GND", "esp:GND.1", "black", [ "v0" ] ],
+    [ "esp:2", "lightLed:A", "yellow", [ "h80", "v-35" ] ],
+    [ "lightLed:C", "lightResistor:1", "black", [ "v0" ] ],
+    [ "lightResistor:2", "esp:GND.2", "black", [ "v40", "h-65" ] ],
+    [ "relay:VCC", "esp:5V", "red", [ "v0" ] ],
+    [ "relay:GND", "esp:GND.2", "black", [ "v0" ] ],
+    [ "relay:IN", "esp:26", "blue", [ "v0" ] ],
+    [ "servo:V+", "esp:5V", "red", [ "v0" ] ],
+    [ "servo:GND", "esp:GND.2", "black", [ "v0" ] ],
+    [ "servo:PWM", "esp:18", "orange", [ "v0" ] ],
+    [ "esp:TX", "$serialMonitor:RX", "", [] ],
+    [ "esp:RX", "$serialMonitor:TX", "", [] ]
+  ],
+  "serialMonitor": { "display": "always", "newline": "lf" },
+  "dependencies": {}
+}
