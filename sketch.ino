@@ -34,8 +34,9 @@ const int BLINDS_OPEN_LEVEL = 50;
 const float BLINDS_CLOSE_TEMP = 27.0;
 const float BLINDS_OPEN_TEMP = 25.0;
 
-// The assignment rule is five minutes. Change DEMO_MODE to true for a
-// ten-second classroom demonstration of the no-motion rule.
+/* Change DEMO_MODE to true for a
+ ten-second classroom demonstration of the no-motion rule. */
+ 
 const bool DEMO_MODE = false;
 const unsigned long OCCUPANCY_TIMEOUT_MS =
   DEMO_MODE ? 10000UL : 300000UL;
