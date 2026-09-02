@@ -2,7 +2,7 @@
 
 This is a fully simulated ESP32 smart-home project for Wokwi. It monitors
 temperature, humidity, motion and ambient light, makes local context-aware
-decisions, controls three simulated outputs and optionally publishes its data
+decisions, controls three simulated outputs and publishes its data
 to Adafruit IO using MQTT.
 
 ## Simulated components
@@ -17,7 +17,7 @@ to Adafruit IO using MQTT.
 | Servo | Motorised blinds | GPIO 18 |
 
 The relay represents whether climate equipment is powered. The Serial Monitor
-and `climate-mode` Adafruit feed identify whether the current software mode is
+and `climate-mode` Adafruit feed identify whether the current mode is
 `HEATING`, `COOLING` or `OFF`.
 
 ## Run in Wokwi
