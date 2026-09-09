@@ -6,8 +6,33 @@
 // ============================================================
 // 3707ICT SMART HOME IoT AUTOMATION SYSTEM
 // ============================================================
+//
+// Sensors:
+//   DHT22  -> Temperature / Humidity
+//   PIR    -> Motion / Occupancy
+//   LDR    -> Ambient Light
+//
+// Actuators:
+//   LED    -> Room Lighting
+//   Relay  -> Climate Control
+//   Servo  -> Motorised Blinds
+//
+// Intelligent Features:
+//   - Occupancy-aware climate control
+//   - Occupancy-aware smart lighting
+//   - Temperature + light smart blinds
+//   - Hysteresis
+//   - Adaptive sensor polling
+//   - Adaptive cloud update frequency
+//
+// Communication:
+//   Wi-Fi + MQTT + Adafruit IO
+// ============================================================
 
-// --------------------------- Hardware pins ---------------------------
+
+// ============================================================
+// HARDWARE PIN DEFINITIONS
+// ============================================================
 
 const int DHT_PIN = 15;
 const int PIR_PIN = 27;
@@ -17,75 +42,116 @@ const int LIGHT_LED_PIN = 2;
 const int CLIMATE_RELAY_PIN = 26;
 const int BLINDS_SERVO_PIN = 18;
 
-// --------------------------- Wi-Fi setup ------------------------------
+
+// ============================================================
+// WI-FI CONFIGURATION
+// ============================================================
 
 const char* WIFI_SSID = "Wokwi-GUEST";
 const char* WIFI_PASSWORD = "";
 
-// ------------------------- Adafruit IO setup --------------------------
 
-// Your Adafruit IO username
+// ============================================================
+// ADAFRUIT IO / MQTT CONFIGURATION
+// ============================================================
+
 const char* AIO_USERNAME = "danielolver";
 
 // IMPORTANT:
-// Paste your NEW regenerated AIO key directly into Wokwi.
-// Do not share it publicly.
+// Paste the regenerated Adafruit IO key directly into Wokwi.
+// Do not place the real key in GitHub or the final report.
+
 const char* AIO_KEY = "YOUR_NEW_AIO_KEY";
 
 const char* MQTT_SERVER = "io.adafruit.com";
 const int MQTT_PORT = 1883;
 
-// ---------------------- Automation configuration ---------------------
 
-// Climate hysteresis
+// ============================================================
+// TEMPERATURE CONTROL
+// ============================================================
+
+// Cooling hysteresis
 const float COOLING_ON_TEMP = 30.0;
 const float COOLING_OFF_TEMP = 28.0;
 
+// Heating hysteresis
 const float HEATING_ON_TEMP = 16.0;
 const float HEATING_OFF_TEMP = 18.0;
 
-// Lighting hysteresis
-// Light percentage:
-// 0% = dark
+
+// ============================================================
+// SMART LIGHTING
+// ============================================================
+
+// Converted light percentage:
+// 0%   = dark
 // 100% = bright
+
 const int LIGHT_ON_LEVEL = 35;
 const int LIGHT_OFF_LEVEL = 45;
 
-// Smart blinds thresholds
+
+// ============================================================
+// SMART BLINDS
+// ============================================================
+
+// Blinds close only when:
+//   Light >= 70%
+// AND
+//   Temperature >= 27°C
+
 const int BLINDS_CLOSE_LEVEL = 70;
 const int BLINDS_OPEN_LEVEL = 50;
 
 const float BLINDS_CLOSE_TEMP = 27.0;
 const float BLINDS_OPEN_TEMP = 25.0;
 
-// -------------------------- Demo mode --------------------------------
 
-// false = real assignment rule of 5 minutes
-// true  = 10 second timeout for demonstration/testing
+// ============================================================
+// OCCUPANCY CONFIGURATION
+// ============================================================
+
+// true  = 10 second timeout for demonstration
+// false = real 5 minute assignment rule
 
 const bool DEMO_MODE = true;
 
 const unsigned long OCCUPANCY_TIMEOUT_MS =
-  DEMO_MODE ? 10000UL : 300000UL;
+  DEMO_MODE
+    ? 10000UL
+    : 300000UL;
 
-// ---------------------- Adaptive polling -----------------------------
 
-// Faster when occupied or abnormal
+// ============================================================
+// ADAPTIVE POLLING
+// ============================================================
+
+// Sensor readings:
+//
+// Active / abnormal conditions = faster
+// Normal / unoccupied = slower
+
 const unsigned long ACTIVE_SENSOR_INTERVAL_MS = 2000UL;
-
-// Slower when room is idle
 const unsigned long NORMAL_SENSOR_INTERVAL_MS = 5000UL;
 
-// Cloud update frequencies
-const unsigned long ACTIVE_CLOUD_INTERVAL_MS = 5000UL;
-const unsigned long NORMAL_CLOUD_INTERVAL_MS = 15000UL;
+// Cloud publishing is deliberately slower than sensor polling.
+// Local automation does NOT depend on cloud updates.
 
-// Reconnection timing
+const unsigned long ACTIVE_CLOUD_INTERVAL_MS = 20000UL;
+const unsigned long NORMAL_CLOUD_INTERVAL_MS = 60000UL;
+
+
+// ============================================================
+// CONNECTION RETRY INTERVALS
+// ============================================================
+
 const unsigned long WIFI_RETRY_INTERVAL_MS = 10000UL;
 const unsigned long MQTT_RETRY_INTERVAL_MS = 5000UL;
 
+
 // ============================================================
-// CLIMATE MODES
+// CLIMATE MODE
 // ============================================================
 
 enum ClimateMode {
@@ -94,8 +160,9 @@ enum ClimateMode {
   CLIMATE_HEATING
 };
 
+
 // ============================================================
-// OBJECTS
+// SYSTEM OBJECTS
 // ============================================================
 
 DHTesp dht;
@@ -104,8 +171,9 @@ Servo blindsServo;
 WiFiClient wifiClient;
 PubSubClient mqttClient(wifiClient);
 
+
 // ============================================================
-// SENSOR / SYSTEM STATES
+// SENSOR VALUES
 // ============================================================
 
 float temperature = 24.0;
@@ -115,12 +183,20 @@ int lightRaw = 0;
 int lightPercent = 50;
 
 bool pirMotion = false;
-bool occupied = false;
 
+
+// ============================================================
+// SYSTEM STATES
+// ============================================================
+
+bool occupied = false;
 bool roomLightOn = false;
 bool blindsClosed = false;
 
+bool dhtHealthy = true;
+
 ClimateMode climateMode = CLIMATE_OFF;
+
 
 // ============================================================
 // TIMING VARIABLES
@@ -129,11 +205,13 @@ ClimateMode climateMode = CLIMATE_OFF;
 unsigned long lastMotionTime = 0;
 unsigned long lastSensorRead = 0;
 unsigned long lastCloudPublish = 0;
+
 unsigned long lastWifiAttempt = 0;
 unsigned long lastMqttAttempt = 0;
 
+
 // ============================================================
-// HELPER FUNCTIONS
+// CLIMATE MODE TEXT
 // ============================================================
 
 const char* climateModeText() {
@@ -149,21 +227,46 @@ const char* climateModeText() {
   return "OFF";
 }
 
-// ------------------------------------------------------------
-// Determines whether faster polling should be used
-// ------------------------------------------------------------
+
+// ============================================================
+// SYSTEM STATUS TEXT
+// ============================================================
+
+const char* systemStatusText() {
+
+  if (!dhtHealthy) {
+    return "SENSOR FAULT";
+  }
+
+  if (WiFi.status() != WL_CONNECTED) {
+    return "LOCAL MODE";
+  }
+
+  if (!mqttClient.connected()) {
+    return "CLOUD OFFLINE";
+  }
+
+  return "ONLINE";
+}
+
+
+// ============================================================
+// DETERMINE IF CONDITIONS REQUIRE FAST POLLING
+// ============================================================
 
 bool environmentAbnormal() {
 
   return (
     temperature >= COOLING_ON_TEMP ||
     temperature <= HEATING_ON_TEMP ||
-    lightPercent <= LIGHT_ON_LEVEL
+    lightPercent <= LIGHT_ON_LEVEL ||
+    lightPercent >= BLINDS_CLOSE_LEVEL
   );
 }
 
+
 // ============================================================
-// WI-FI
+// WI-FI MANAGEMENT
 // ============================================================
 
 void maintainWiFi() {
@@ -184,8 +287,7 @@ void maintainWiFi() {
   lastWifiAttempt = now;
 
   Serial.println();
-  Serial.println("Wi-Fi disconnected.");
-  Serial.println("Attempting Wi-Fi connection...");
+  Serial.println("NETWORK: Attempting Wi-Fi connection...");
 
   WiFi.mode(WIFI_STA);
 
@@ -196,16 +298,18 @@ void maintainWiFi() {
   );
 }
 
+
 // ============================================================
-// MQTT CONNECTION
+// MQTT MANAGEMENT
 // ============================================================
 
 void maintainMQTT() {
 
-  if (
-    WiFi.status() != WL_CONNECTED ||
-    mqttClient.connected()
-  ) {
+  if (WiFi.status() != WL_CONNECTED) {
+    return;
+  }
+
+  if (mqttClient.connected()) {
     return;
   }
 
@@ -228,7 +332,7 @@ void maintainMQTT() {
     );
 
   Serial.print(
-    "Connecting to Adafruit IO MQTT... "
+    "MQTT: Connecting to Adafruit IO... "
   );
 
   if (
@@ -244,13 +348,15 @@ void maintainMQTT() {
 
   else {
 
-    Serial.print("FAILED - MQTT state: ");
-    Serial.println(mqttClient.state());
+    Serial.print("FAILED (state ");
+    Serial.print(mqttClient.state());
+    Serial.println(")");
   }
 }
 
+
 // ============================================================
-// MQTT PUBLISHING
+// MQTT FEED PUBLISH FUNCTION
 // ============================================================
 
 void publishFeed(
@@ -276,20 +382,26 @@ void publishFeed(
   if (!success) {
 
     Serial.print(
-      "Publish failed for feed: "
+      "MQTT WARNING: Failed to publish "
     );
 
     Serial.println(feedName);
   }
 }
 
-// ------------------------------------------------------------
-// Publish all dashboard values
-// ------------------------------------------------------------
+
+// ============================================================
+// PUBLISH DATA TO ADAFRUIT IO
+// ============================================================
 
 void publishCloudData() {
 
   if (!mqttClient.connected()) {
+
+    Serial.println(
+      "CLOUD: MQTT offline - local automation continues."
+    );
+
     return;
   }
 
@@ -330,13 +442,14 @@ void publishCloudData() {
 
   publishFeed(
     "system-status",
-    "ONLINE"
+    systemStatusText()
   );
 
   Serial.println(
-    "Cloud data published to Adafruit IO."
+    "CLOUD: Data published to Adafruit IO."
   );
 }
+
 
 // ============================================================
 // SENSOR READING
@@ -344,38 +457,40 @@ void publishCloudData() {
 
 void readSensors() {
 
-  // ---------------- DHT22 ----------------
+  // ----------------------------------------------------------
+  // DHT22
+  // ----------------------------------------------------------
 
   TempAndHumidity dhtData =
     dht.getTempAndHumidity();
 
-  if (!isnan(dhtData.temperature)) {
+  if (
+    isnan(dhtData.temperature) ||
+    isnan(dhtData.humidity)
+  ) {
 
-    temperature =
-      dhtData.temperature;
+    dhtHealthy = false;
+
+    Serial.println(
+      "SENSOR WARNING: Invalid DHT22 reading."
+    );
   }
 
   else {
 
-    Serial.println(
-      "WARNING: Invalid temperature reading."
-    );
-  }
+    dhtHealthy = true;
 
-  if (!isnan(dhtData.humidity)) {
+    temperature =
+      dhtData.temperature;
 
     humidity =
       dhtData.humidity;
   }
 
-  else {
 
-    Serial.println(
-      "WARNING: Invalid humidity reading."
-    );
-  }
-
-  // ---------------- PIR ----------------
+  // ----------------------------------------------------------
+  // PIR MOTION
+  // ----------------------------------------------------------
 
   pirMotion =
     digitalRead(PIR_PIN) == HIGH;
@@ -383,6 +498,13 @@ void readSensors() {
   if (pirMotion) {
 
     lastMotionTime = millis();
+
+    if (!occupied) {
+
+      Serial.println(
+        "OCCUPANCY: Person detected."
+      );
+    }
 
     occupied = true;
   }
@@ -396,17 +518,20 @@ void readSensors() {
     occupied = false;
 
     Serial.println(
-      "AUTOMATION: Occupancy timeout - room now unoccupied."
+      "OCCUPANCY: Timeout reached - room unoccupied."
     );
   }
 
-  // ---------------- LDR ----------------
+
+  // ----------------------------------------------------------
+  // LIGHT SENSOR
+  // ----------------------------------------------------------
 
   lightRaw =
     analogRead(LDR_PIN);
 
   /*
-     Convert ESP32 ADC reading to a percentage.
+     Convert raw ESP32 ADC reading to percentage.
 
      0%   = dark
      100% = bright
@@ -426,34 +551,52 @@ void readSensors() {
     );
 }
 
+
 // ============================================================
-// CLIMATE CONTROL
+// CLIMATE AUTOMATION
 // ============================================================
 
 void updateClimateControl() {
 
   // ----------------------------------------------------------
-  // Nobody in room -> climate OFF
+  // FAILSAFE
+  // ----------------------------------------------------------
+
+  // Invalid DHT22 data means climate control is disabled.
+
+  if (!dhtHealthy) {
+
+    climateMode = CLIMATE_OFF;
+
+    digitalWrite(
+      CLIMATE_RELAY_PIN,
+      LOW
+    );
+
+    return;
+  }
+
+
+  // ----------------------------------------------------------
+  // OCCUPANCY-AWARE CONTROL
   // ----------------------------------------------------------
 
   if (!occupied) {
 
-    climateMode =
-      CLIMATE_OFF;
+    climateMode = CLIMATE_OFF;
   }
 
+
   // ----------------------------------------------------------
-  // Climate currently OFF
+  // CLIMATE CURRENTLY OFF
   // ----------------------------------------------------------
 
   else if (
-    climateMode ==
-    CLIMATE_OFF
+    climateMode == CLIMATE_OFF
   ) {
 
     if (
-      temperature >=
-      COOLING_ON_TEMP
+      temperature >= COOLING_ON_TEMP
     ) {
 
       climateMode =
@@ -465,8 +608,7 @@ void updateClimateControl() {
     }
 
     else if (
-      temperature <=
-      HEATING_ON_TEMP
+      temperature <= HEATING_ON_TEMP
     ) {
 
       climateMode =
@@ -478,8 +620,9 @@ void updateClimateControl() {
     }
   }
 
+
   // ----------------------------------------------------------
-  // Cooling hysteresis
+  // COOLING HYSTERESIS
   // ----------------------------------------------------------
 
   else if (
@@ -497,8 +640,9 @@ void updateClimateControl() {
     );
   }
 
+
   // ----------------------------------------------------------
-  // Heating hysteresis
+  // HEATING HYSTERESIS
   // ----------------------------------------------------------
 
   else if (
@@ -516,14 +660,16 @@ void updateClimateControl() {
     );
   }
 
-  // Relay represents active climate system
+
   digitalWrite(
     CLIMATE_RELAY_PIN,
-    climateMode == CLIMATE_OFF
-      ? LOW
-      : HIGH
+    climateMode ==
+      CLIMATE_OFF
+        ? LOW
+        : HIGH
   );
 }
+
 
 // ============================================================
 // SMART LIGHTING
@@ -531,14 +677,24 @@ void updateClimateControl() {
 
 void updateRoomLighting() {
 
-  // Empty room -> light OFF
+  // No occupant = light always OFF.
 
   if (!occupied) {
+
+    if (roomLightOn) {
+
+      Serial.println(
+        "AUTOMATION: Room light OFF - room unoccupied."
+      );
+    }
 
     roomLightOn = false;
   }
 
-  // Dark + occupied -> light ON
+
+  // ----------------------------------------------------------
+  // DARK + OCCUPIED
+  // ----------------------------------------------------------
 
   else if (
     !roomLightOn &&
@@ -549,11 +705,14 @@ void updateRoomLighting() {
     roomLightOn = true;
 
     Serial.println(
-      "AUTOMATION: Smart lighting ON."
+      "AUTOMATION: Room light ON - dark and occupied."
     );
   }
 
-  // Bright enough -> light OFF
+
+  // ----------------------------------------------------------
+  // BRIGHT ENOUGH
+  // ----------------------------------------------------------
 
   else if (
     roomLightOn &&
@@ -564,9 +723,10 @@ void updateRoomLighting() {
     roomLightOn = false;
 
     Serial.println(
-      "AUTOMATION: Smart lighting OFF."
+      "AUTOMATION: Room light OFF - sufficient daylight."
     );
   }
+
 
   digitalWrite(
     LIGHT_LED_PIN,
@@ -576,21 +736,29 @@ void updateRoomLighting() {
   );
 }
 
+
 // ============================================================
-// SMART MOTORISED BLINDS
+// INTELLIGENT BLIND CONTROL
 // ============================================================
 
 void updateBlinds() {
 
   /*
-     Edge intelligence:
+     MULTI-SENSOR EDGE INTELLIGENCE
 
-     Close blinds only when the room is BOTH
-     bright and warm.
+     Blinds only close when BOTH:
 
-     This reduces solar heat gain while avoiding
-     unnecessary blind movement.
+     1. Light is strong
+     2. Temperature is warm
+
+     This represents reducing solar heat gain without
+     unnecessarily blocking useful daylight.
   */
+
+
+  // ----------------------------------------------------------
+  // CLOSE BLINDS
+  // ----------------------------------------------------------
 
   if (
     !blindsClosed &&
@@ -605,14 +773,14 @@ void updateBlinds() {
     blindsServo.write(90);
 
     Serial.println(
-      "AUTOMATION: Blinds CLOSED."
+      "INTELLIGENCE: Blinds CLOSED - bright and warm."
     );
   }
 
-  /*
-     Re-open if it becomes darker OR
-     the room cools down.
-  */
+
+  // ----------------------------------------------------------
+  // OPEN BLINDS
+  // ----------------------------------------------------------
 
   else if (
     blindsClosed &&
@@ -629,13 +797,14 @@ void updateBlinds() {
     blindsServo.write(0);
 
     Serial.println(
-      "AUTOMATION: Blinds OPEN."
+      "INTELLIGENCE: Blinds OPEN."
     );
   }
 }
 
+
 // ============================================================
-// APPLY ALL AUTOMATION
+// APPLY AUTOMATION RULES
 // ============================================================
 
 void applyAutomationRules() {
@@ -647,8 +816,9 @@ void applyAutomationRules() {
   updateBlinds();
 }
 
+
 // ============================================================
-// SERIAL MONITOR STATUS
+// SERIAL STATUS DISPLAY
 // ============================================================
 
 void printSystemState() {
@@ -660,29 +830,29 @@ void printSystemState() {
   );
 
   Serial.println(
-    "         SMART HOME SYSTEM STATUS"
+    "       3707ICT SMART HOME SYSTEM STATUS"
   );
 
   Serial.println(
     "=================================================="
   );
 
-  Serial.print("Temperature: ");
+  Serial.print("Temperature       : ");
   Serial.print(temperature, 1);
   Serial.println(" C");
 
-  Serial.print("Humidity: ");
+  Serial.print("Humidity          : ");
   Serial.print(humidity, 1);
   Serial.println(" %");
 
-  Serial.print("Ambient Light: ");
+  Serial.print("Ambient Light     : ");
   Serial.print(lightPercent);
   Serial.println(" %");
 
-  Serial.print("Raw LDR Value: ");
+  Serial.print("Raw LDR           : ");
   Serial.println(lightRaw);
 
-  Serial.print("PIR Motion: ");
+  Serial.print("Motion            : ");
 
   Serial.println(
     pirMotion
@@ -690,7 +860,7 @@ void printSystemState() {
       : "CLEAR"
   );
 
-  Serial.print("Occupancy: ");
+  Serial.print("Occupancy         : ");
 
   Serial.println(
     occupied
@@ -698,7 +868,7 @@ void printSystemState() {
       : "UNOCCUPIED"
   );
 
-  Serial.print("Room Light: ");
+  Serial.print("Room Light        : ");
 
   Serial.println(
     roomLightOn
@@ -706,13 +876,13 @@ void printSystemState() {
       : "OFF"
   );
 
-  Serial.print("Climate Mode: ");
+  Serial.print("Climate Mode      : ");
 
   Serial.println(
     climateModeText()
   );
 
-  Serial.print("Blinds Position: ");
+  Serial.print("Blinds            : ");
 
   Serial.println(
     blindsClosed
@@ -720,16 +890,24 @@ void printSystemState() {
       : "OPEN"
   );
 
-  Serial.print("Wi-Fi: ");
+  Serial.print("DHT22 Status      : ");
+
+  Serial.println(
+    dhtHealthy
+      ? "OK"
+      : "FAULT"
+  );
+
+  Serial.print("Wi-Fi             : ");
 
   Serial.println(
     WiFi.status() ==
       WL_CONNECTED
-      ? "CONNECTED"
-      : "DISCONNECTED"
+        ? "CONNECTED"
+        : "DISCONNECTED"
   );
 
-  Serial.print("MQTT / Cloud: ");
+  Serial.print("MQTT              : ");
 
   Serial.println(
     mqttClient.connected()
@@ -737,7 +915,13 @@ void printSystemState() {
       : "OFFLINE"
   );
 
-  Serial.print("Polling Mode: ");
+  Serial.print("System Status     : ");
+
+  Serial.println(
+    systemStatusText()
+  );
+
+  Serial.print("Adaptive Polling  : ");
 
   Serial.println(
     (
@@ -755,6 +939,7 @@ void printSystemState() {
   Serial.println();
 }
 
+
 // ============================================================
 // SETUP
 // ============================================================
@@ -771,10 +956,13 @@ void setup() {
   );
 
   Serial.println(
-    "System starting..."
+    "Initialising..."
   );
 
-  // ---------------- Inputs ----------------
+
+  // ----------------------------------------------------------
+  // INPUTS
+  // ----------------------------------------------------------
 
   pinMode(
     PIR_PIN,
@@ -786,7 +974,10 @@ void setup() {
     INPUT
   );
 
-  // ---------------- Outputs ----------------
+
+  // ----------------------------------------------------------
+  // OUTPUTS
+  // ----------------------------------------------------------
 
   pinMode(
     LIGHT_LED_PIN,
@@ -808,14 +999,20 @@ void setup() {
     LOW
   );
 
-  // ---------------- DHT22 ----------------
+
+  // ----------------------------------------------------------
+  // DHT22
+  // ----------------------------------------------------------
 
   dht.setup(
     DHT_PIN,
     DHTesp::DHT22
   );
 
-  // ---------------- Servo ----------------
+
+  // ----------------------------------------------------------
+  // SERVO
+  // ----------------------------------------------------------
 
   blindsServo.setPeriodHertz(50);
 
@@ -827,7 +1024,10 @@ void setup() {
 
   blindsServo.write(0);
 
-  // ---------------- MQTT ----------------
+
+  // ----------------------------------------------------------
+  // MQTT
+  // ----------------------------------------------------------
 
   mqttClient.setServer(
     MQTT_SERVER,
@@ -836,25 +1036,37 @@ void setup() {
 
   mqttClient.setBufferSize(256);
 
-  // ---------------- Wi-Fi ----------------
+
+  // ----------------------------------------------------------
+  // WI-FI
+  // ----------------------------------------------------------
 
   maintainWiFi();
+
+
+  // ----------------------------------------------------------
+  // DEMONSTRATION MODE
+  // ----------------------------------------------------------
 
   if (DEMO_MODE) {
 
     Serial.println(
-      "DEMO MODE ACTIVE: occupancy timeout = 10 seconds"
+      "DEMO MODE: Occupancy timeout = 10 seconds."
     );
   }
 
   else {
 
     Serial.println(
-      "NORMAL MODE: occupancy timeout = 5 minutes"
+      "NORMAL MODE: Occupancy timeout = 5 minutes."
     );
   }
 
-  // Initial sensor reading
+
+  // ----------------------------------------------------------
+  // INITIAL SYSTEM STATE
+  // ----------------------------------------------------------
+
   readSensors();
 
   applyAutomationRules();
@@ -866,21 +1078,27 @@ void setup() {
   );
 }
 
+
 // ============================================================
 // MAIN LOOP
 // ============================================================
 
 void loop() {
 
-  // Maintain network connections
+  // ----------------------------------------------------------
+  // NETWORK MAINTENANCE
+  // ----------------------------------------------------------
+
   maintainWiFi();
 
   maintainMQTT();
 
   mqttClient.loop();
 
+
   unsigned long now =
     millis();
+
 
   // ==========================================================
   // ADAPTIVE SENSOR POLLING
@@ -893,6 +1111,7 @@ void loop() {
     )
       ? ACTIVE_SENSOR_INTERVAL_MS
       : NORMAL_SENSOR_INTERVAL_MS;
+
 
   if (
     now - lastSensorRead >=
@@ -908,8 +1127,9 @@ void loop() {
     printSystemState();
   }
 
+
   // ==========================================================
-  // ADAPTIVE CLOUD UPDATES
+  // ADAPTIVE CLOUD PUBLISHING
   // ==========================================================
 
   unsigned long cloudInterval =
@@ -919,6 +1139,7 @@ void loop() {
     )
       ? ACTIVE_CLOUD_INTERVAL_MS
       : NORMAL_CLOUD_INTERVAL_MS;
+
 
   if (
     now - lastCloudPublish >=
