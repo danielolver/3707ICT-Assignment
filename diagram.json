@@ -48,7 +48,7 @@
       "left": 167,
       "attrs": {
         "color": "yellow",
-        "label": "ROOM LIGHT"
+        "label": "SMART ROOM LIGHT"
       }
     },
 
@@ -69,7 +69,7 @@
       "top": 125,
       "left": 345.6,
       "attrs": {
-        "label": "CLIMATE"
+        "label": "CLIMATE CONTROL"
       }
     },
 
@@ -80,7 +80,7 @@
       "left": 240,
       "attrs": {
         "horn": "single",
-        "label": "BLINDS"
+        "label": "MOTORISED BLINDS"
       }
     }
   ],
