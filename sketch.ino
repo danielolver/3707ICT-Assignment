@@ -162,7 +162,7 @@ void readSensors() {
   pirMotion = digitalRead(PIR_PIN) == HIGH;
   lightRaw = analogRead(LDR_PIN);
 
-  // Wokwi's photoresistor output increases as the scene becomes darker.
+  // Photoresistor output increases as the scene becomes darker.
   lightPercent = constrain(map(lightRaw, 4095, 0, 0, 100), 0, 100);
 
   if (pirMotion) {
