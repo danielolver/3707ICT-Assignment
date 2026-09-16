@@ -4,6 +4,8 @@
 #include <DHTesp.h>
 #include <ESP32Servo.h>
 
+#include "secrets.h" // for adafruit key
+
 // ============================================================
 // 3707ICT SMART HOME IoT AUTOMATION SYSTEM
 // ============================================================
@@ -32,13 +34,6 @@ const char* WIFI_PASSWORD = "";
 // ============================================================
 // ADAFRUIT IO / MQTT TLS CONFIGURATION
 // ============================================================
-
-const char* AIO_USERNAME = "danielolver";
-
-// IMPORTANT:
-// Put your NEW Adafruit IO key here.
-// Regenerate the old key because it has been exposed.
-const char* AIO_KEY = "aio_dKJi22zxKXXDXigs7WCIIUWZ05X4";
 
 const char* MQTT_SERVER = "io.adafruit.com";
 const int MQTT_PORT = 8883;
