@@ -57,11 +57,7 @@ const char* WIFI_PASSWORD = "";
 
 const char* AIO_USERNAME = "danielolver";
 
-// IMPORTANT:
-// Paste the regenerated Adafruit IO key directly into Wokwi.
-// Do not place the real key in GitHub or the final report.
-
-const char* AIO_KEY = "YOUR_NEW_AIO_KEY";
+const char* AIO_KEY = "aio_dKJi22zxKXXDXigs7WCIIUWZ05X4";
 
 const char* MQTT_SERVER = "io.adafruit.com";
 const int MQTT_PORT = 1883;
