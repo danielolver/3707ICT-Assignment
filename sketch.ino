@@ -60,7 +60,7 @@ const char* AIO_USERNAME = "danielolver";
 const char* AIO_KEY = "aio_dKJi22zxKXXDXigs7WCIIUWZ05X4";
 
 const char* MQTT_SERVER = "io.adafruit.com";
-const int MQTT_PORT = 1883;
+const int MQTT_PORT = 8883;   // 8883 secure port , 1883 plaintext
 
 
 // ============================================================
