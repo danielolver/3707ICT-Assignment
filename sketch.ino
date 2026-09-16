@@ -1,4 +1,5 @@
 #include <WiFi.h>
+#include <WiFiClientSecure.h>
 #include <PubSubClient.h>
 #include <DHTesp.h>
 #include <ESP32Servo.h>
@@ -6,29 +7,6 @@
 // ============================================================
 // 3707ICT SMART HOME IoT AUTOMATION SYSTEM
 // ============================================================
-//
-// Sensors:
-//   DHT22  -> Temperature / Humidity
-//   PIR    -> Motion / Occupancy
-//   LDR    -> Ambient Light
-//
-// Actuators:
-//   LED    -> Room Lighting
-//   Relay  -> Climate Control
-//   Servo  -> Motorised Blinds
-//
-// Intelligent Features:
-//   - Occupancy-aware climate control
-//   - Occupancy-aware smart lighting
-//   - Temperature + light smart blinds
-//   - Hysteresis
-//   - Adaptive sensor polling
-//   - Adaptive cloud update frequency
-//
-// Communication:
-//   Wi-Fi + MQTT + Adafruit IO
-// ============================================================
-
 
 // ============================================================
 // HARDWARE PIN DEFINITIONS
@@ -52,26 +30,27 @@ const char* WIFI_PASSWORD = "";
 
 
 // ============================================================
-// ADAFRUIT IO / MQTT CONFIGURATION
+// ADAFRUIT IO / MQTT TLS CONFIGURATION
 // ============================================================
 
 const char* AIO_USERNAME = "danielolver";
 
+// IMPORTANT:
+// Put your NEW Adafruit IO key here.
+// Regenerate the old key because it has been exposed.
 const char* AIO_KEY = "aio_dKJi22zxKXXDXigs7WCIIUWZ05X4";
 
 const char* MQTT_SERVER = "io.adafruit.com";
-const int MQTT_PORT = 8883;   // 8883 secure port , 1883 plaintext
+const int MQTT_PORT = 8883;
 
 
 // ============================================================
 // TEMPERATURE CONTROL
 // ============================================================
 
-// Cooling hysteresis
 const float COOLING_ON_TEMP = 30.0;
 const float COOLING_OFF_TEMP = 28.0;
 
-// Heating hysteresis
 const float HEATING_ON_TEMP = 16.0;
 const float HEATING_OFF_TEMP = 18.0;
 
@@ -80,10 +59,6 @@ const float HEATING_OFF_TEMP = 18.0;
 // SMART LIGHTING
 // ============================================================
 
-// Converted light percentage:
-// 0%   = dark
-// 100% = bright
-
 const int LIGHT_ON_LEVEL = 35;
 const int LIGHT_OFF_LEVEL = 45;
 
@@ -91,11 +66,6 @@ const int LIGHT_OFF_LEVEL = 45;
 // ============================================================
 // SMART BLINDS
 // ============================================================
-
-// Blinds close only when:
-//   Light >= 70%
-// AND
-//   Temperature >= 27°C
 
 const int BLINDS_CLOSE_LEVEL = 70;
 const int BLINDS_OPEN_LEVEL = 50;
@@ -108,31 +78,18 @@ const float BLINDS_OPEN_TEMP = 25.0;
 // OCCUPANCY CONFIGURATION
 // ============================================================
 
-// true  = 10 second timeout for demonstration
-// false = real 5 minute assignment rule
-
 const bool DEMO_MODE = true;
 
 const unsigned long OCCUPANCY_TIMEOUT_MS =
-  DEMO_MODE
-    ? 10000UL
-    : 300000UL;
+  DEMO_MODE ? 10000UL : 300000UL;
 
 
 // ============================================================
 // ADAPTIVE POLLING
 // ============================================================
 
-// Sensor readings:
-//
-// Active / abnormal conditions = faster
-// Normal / unoccupied = slower
-
 const unsigned long ACTIVE_SENSOR_INTERVAL_MS = 2000UL;
 const unsigned long NORMAL_SENSOR_INTERVAL_MS = 5000UL;
-
-// Cloud publishing is deliberately slower than sensor polling.
-// Local automation does NOT depend on cloud updates.
 
 const unsigned long ACTIVE_CLOUD_INTERVAL_MS = 20000UL;
 const unsigned long NORMAL_CLOUD_INTERVAL_MS = 60000UL;
@@ -164,7 +121,9 @@ enum ClimateMode {
 DHTesp dht;
 Servo blindsServo;
 
-WiFiClient wifiClient;
+// Secure TLS client required for MQTT port 8883
+WiFiClientSecure wifiClient;
+
 PubSubClient mqttClient(wifiClient);
 
 
@@ -225,7 +184,7 @@ const char* climateModeText() {
 
 
 // ============================================================
-// SYSTEM STATUS TEXT
+// SYSTEM STATUS
 // ============================================================
 
 const char* systemStatusText() {
@@ -247,7 +206,7 @@ const char* systemStatusText() {
 
 
 // ============================================================
-// DETERMINE IF CONDITIONS REQUIRE FAST POLLING
+// ABNORMAL ENVIRONMENT CHECK
 // ============================================================
 
 bool environmentAbnormal() {
@@ -296,7 +255,7 @@ void maintainWiFi() {
 
 
 // ============================================================
-// MQTT MANAGEMENT
+// MQTT TLS MANAGEMENT
 // ============================================================
 
 void maintainMQTT() {
@@ -328,7 +287,7 @@ void maintainMQTT() {
     );
 
   Serial.print(
-    "MQTT: Connecting to Adafruit IO... "
+    "MQTT TLS: Connecting to Adafruit IO on port 8883... "
   );
 
   if (
@@ -395,7 +354,7 @@ void publishCloudData() {
   if (!mqttClient.connected()) {
 
     Serial.println(
-      "CLOUD: MQTT offline - local automation continues."
+      "CLOUD: MQTT TLS offline - local automation continues."
     );
 
     return;
@@ -442,7 +401,7 @@ void publishCloudData() {
   );
 
   Serial.println(
-    "CLOUD: Data published to Adafruit IO."
+    "CLOUD: Data securely published to Adafruit IO."
   );
 }
 
@@ -452,10 +411,6 @@ void publishCloudData() {
 // ============================================================
 
 void readSensors() {
-
-  // ----------------------------------------------------------
-  // DHT22
-  // ----------------------------------------------------------
 
   TempAndHumidity dhtData =
     dht.getTempAndHumidity();
@@ -476,18 +431,12 @@ void readSensors() {
 
     dhtHealthy = true;
 
-    temperature =
-      dhtData.temperature;
-
-    humidity =
-      dhtData.humidity;
+    temperature = dhtData.temperature;
+    humidity = dhtData.humidity;
   }
 
 
-  // ----------------------------------------------------------
-  // PIR MOTION
-  // ----------------------------------------------------------
-
+  // PIR
   pirMotion =
     digitalRead(PIR_PIN) == HIGH;
 
@@ -508,7 +457,7 @@ void readSensors() {
   else if (
     occupied &&
     millis() - lastMotionTime >=
-    OCCUPANCY_TIMEOUT_MS
+      OCCUPANCY_TIMEOUT_MS
   ) {
 
     occupied = false;
@@ -519,19 +468,9 @@ void readSensors() {
   }
 
 
-  // ----------------------------------------------------------
-  // LIGHT SENSOR
-  // ----------------------------------------------------------
-
+  // LDR
   lightRaw =
     analogRead(LDR_PIN);
-
-  /*
-     Convert raw ESP32 ADC reading to percentage.
-
-     0%   = dark
-     100% = bright
-  */
 
   lightPercent =
     constrain(
@@ -554,12 +493,6 @@ void readSensors() {
 
 void updateClimateControl() {
 
-  // ----------------------------------------------------------
-  // FAILSAFE
-  // ----------------------------------------------------------
-
-  // Invalid DHT22 data means climate control is disabled.
-
   if (!dhtHealthy) {
 
     climateMode = CLIMATE_OFF;
@@ -573,19 +506,10 @@ void updateClimateControl() {
   }
 
 
-  // ----------------------------------------------------------
-  // OCCUPANCY-AWARE CONTROL
-  // ----------------------------------------------------------
-
   if (!occupied) {
 
     climateMode = CLIMATE_OFF;
   }
-
-
-  // ----------------------------------------------------------
-  // CLIMATE CURRENTLY OFF
-  // ----------------------------------------------------------
 
   else if (
     climateMode == CLIMATE_OFF
@@ -616,16 +540,9 @@ void updateClimateControl() {
     }
   }
 
-
-  // ----------------------------------------------------------
-  // COOLING HYSTERESIS
-  // ----------------------------------------------------------
-
   else if (
-    climateMode ==
-      CLIMATE_COOLING &&
-    temperature <=
-      COOLING_OFF_TEMP
+    climateMode == CLIMATE_COOLING &&
+    temperature <= COOLING_OFF_TEMP
   ) {
 
     climateMode =
@@ -636,16 +553,9 @@ void updateClimateControl() {
     );
   }
 
-
-  // ----------------------------------------------------------
-  // HEATING HYSTERESIS
-  // ----------------------------------------------------------
-
   else if (
-    climateMode ==
-      CLIMATE_HEATING &&
-    temperature >=
-      HEATING_OFF_TEMP
+    climateMode == CLIMATE_HEATING &&
+    temperature >= HEATING_OFF_TEMP
   ) {
 
     climateMode =
@@ -659,10 +569,9 @@ void updateClimateControl() {
 
   digitalWrite(
     CLIMATE_RELAY_PIN,
-    climateMode ==
-      CLIMATE_OFF
-        ? LOW
-        : HIGH
+    climateMode == CLIMATE_OFF
+      ? LOW
+      : HIGH
   );
 }
 
@@ -672,8 +581,6 @@ void updateClimateControl() {
 // ============================================================
 
 void updateRoomLighting() {
-
-  // No occupant = light always OFF.
 
   if (!occupied) {
 
@@ -687,15 +594,9 @@ void updateRoomLighting() {
     roomLightOn = false;
   }
 
-
-  // ----------------------------------------------------------
-  // DARK + OCCUPIED
-  // ----------------------------------------------------------
-
   else if (
     !roomLightOn &&
-    lightPercent <=
-      LIGHT_ON_LEVEL
+    lightPercent <= LIGHT_ON_LEVEL
   ) {
 
     roomLightOn = true;
@@ -705,15 +606,9 @@ void updateRoomLighting() {
     );
   }
 
-
-  // ----------------------------------------------------------
-  // BRIGHT ENOUGH
-  // ----------------------------------------------------------
-
   else if (
     roomLightOn &&
-    lightPercent >=
-      LIGHT_OFF_LEVEL
+    lightPercent >= LIGHT_OFF_LEVEL
   ) {
 
     roomLightOn = false;
@@ -726,9 +621,7 @@ void updateRoomLighting() {
 
   digitalWrite(
     LIGHT_LED_PIN,
-    roomLightOn
-      ? HIGH
-      : LOW
+    roomLightOn ? HIGH : LOW
   );
 }
 
@@ -739,29 +632,10 @@ void updateRoomLighting() {
 
 void updateBlinds() {
 
-  /*
-     MULTI-SENSOR EDGE INTELLIGENCE
-
-     Blinds only close when BOTH:
-
-     1. Light is strong
-     2. Temperature is warm
-
-     This represents reducing solar heat gain without
-     unnecessarily blocking useful daylight.
-  */
-
-
-  // ----------------------------------------------------------
-  // CLOSE BLINDS
-  // ----------------------------------------------------------
-
   if (
     !blindsClosed &&
-    lightPercent >=
-      BLINDS_CLOSE_LEVEL &&
-    temperature >=
-      BLINDS_CLOSE_TEMP
+    lightPercent >= BLINDS_CLOSE_LEVEL &&
+    temperature >= BLINDS_CLOSE_TEMP
   ) {
 
     blindsClosed = true;
@@ -773,18 +647,11 @@ void updateBlinds() {
     );
   }
 
-
-  // ----------------------------------------------------------
-  // OPEN BLINDS
-  // ----------------------------------------------------------
-
   else if (
     blindsClosed &&
     (
-      lightPercent <=
-        BLINDS_OPEN_LEVEL ||
-      temperature <=
-        BLINDS_OPEN_TEMP
+      lightPercent <= BLINDS_OPEN_LEVEL ||
+      temperature <= BLINDS_OPEN_TEMP
     )
   ) {
 
@@ -806,9 +673,7 @@ void updateBlinds() {
 void applyAutomationRules() {
 
   updateClimateControl();
-
   updateRoomLighting();
-
   updateBlinds();
 }
 
@@ -849,70 +714,53 @@ void printSystemState() {
   Serial.println(lightRaw);
 
   Serial.print("Motion            : ");
-
   Serial.println(
-    pirMotion
-      ? "DETECTED"
-      : "CLEAR"
+    pirMotion ? "DETECTED" : "CLEAR"
   );
 
   Serial.print("Occupancy         : ");
-
   Serial.println(
-    occupied
-      ? "OCCUPIED"
-      : "UNOCCUPIED"
+    occupied ? "OCCUPIED" : "UNOCCUPIED"
   );
 
   Serial.print("Room Light        : ");
-
   Serial.println(
-    roomLightOn
-      ? "ON"
-      : "OFF"
+    roomLightOn ? "ON" : "OFF"
   );
 
   Serial.print("Climate Mode      : ");
-
   Serial.println(
     climateModeText()
   );
 
   Serial.print("Blinds            : ");
-
   Serial.println(
-    blindsClosed
-      ? "CLOSED"
-      : "OPEN"
+    blindsClosed ? "CLOSED" : "OPEN"
   );
 
   Serial.print("DHT22 Status      : ");
-
   Serial.println(
-    dhtHealthy
-      ? "OK"
-      : "FAULT"
+    dhtHealthy ? "OK" : "FAULT"
   );
 
   Serial.print("Wi-Fi             : ");
-
   Serial.println(
-    WiFi.status() ==
-      WL_CONNECTED
-        ? "CONNECTED"
-        : "DISCONNECTED"
+    WiFi.status() == WL_CONNECTED
+      ? "CONNECTED"
+      : "DISCONNECTED"
   );
 
-  Serial.print("MQTT              : ");
-
+  Serial.print("MQTT TLS          : ");
   Serial.println(
     mqttClient.connected()
       ? "CONNECTED"
       : "OFFLINE"
   );
 
-  Serial.print("System Status     : ");
+  Serial.print("MQTT Port         : ");
+  Serial.println(MQTT_PORT);
 
+  Serial.print("System Status     : ");
   Serial.println(
     systemStatusText()
   );
@@ -947,6 +795,7 @@ void setup() {
   delay(500);
 
   Serial.println();
+
   Serial.println(
     "3707ICT Smart Home IoT Automation System"
   );
@@ -956,10 +805,7 @@ void setup() {
   );
 
 
-  // ----------------------------------------------------------
   // INPUTS
-  // ----------------------------------------------------------
-
   pinMode(
     PIR_PIN,
     INPUT
@@ -971,10 +817,7 @@ void setup() {
   );
 
 
-  // ----------------------------------------------------------
   // OUTPUTS
-  // ----------------------------------------------------------
-
   pinMode(
     LIGHT_LED_PIN,
     OUTPUT
@@ -996,20 +839,14 @@ void setup() {
   );
 
 
-  // ----------------------------------------------------------
   // DHT22
-  // ----------------------------------------------------------
-
   dht.setup(
     DHT_PIN,
     DHTesp::DHT22
   );
 
 
-  // ----------------------------------------------------------
   // SERVO
-  // ----------------------------------------------------------
-
   blindsServo.setPeriodHertz(50);
 
   blindsServo.attach(
@@ -1021,9 +858,21 @@ void setup() {
   blindsServo.write(0);
 
 
-  // ----------------------------------------------------------
-  // MQTT
-  // ----------------------------------------------------------
+  // ==========================================================
+  // ADAFRUIT IO MQTT TLS
+  // ==========================================================
+
+  /*
+     Port 8883 requires TLS.
+
+     WiFiClientSecure encrypts the connection.
+
+     setInsecure() disables CA certificate validation.
+     This is suitable for the Wokwi demonstration but a
+     production system should validate the server certificate.
+  */
+
+  wifiClient.setInsecure();
 
   mqttClient.setServer(
     MQTT_SERVER,
@@ -1033,16 +882,14 @@ void setup() {
   mqttClient.setBufferSize(256);
 
 
-  // ----------------------------------------------------------
-  // WI-FI
-  // ----------------------------------------------------------
+  Serial.println(
+    "MQTT: TLS enabled - Adafruit IO port 8883"
+  );
 
+
+  // WI-FI
   maintainWiFi();
 
-
-  // ----------------------------------------------------------
-  // DEMONSTRATION MODE
-  // ----------------------------------------------------------
 
   if (DEMO_MODE) {
 
@@ -1058,10 +905,6 @@ void setup() {
     );
   }
 
-
-  // ----------------------------------------------------------
-  // INITIAL SYSTEM STATE
-  // ----------------------------------------------------------
 
   readSensors();
 
@@ -1080,10 +923,6 @@ void setup() {
 // ============================================================
 
 void loop() {
-
-  // ----------------------------------------------------------
-  // NETWORK MAINTENANCE
-  // ----------------------------------------------------------
 
   maintainWiFi();
 
@@ -1111,7 +950,7 @@ void loop() {
 
   if (
     now - lastSensorRead >=
-    sensorInterval
+      sensorInterval
   ) {
 
     lastSensorRead = now;
@@ -1139,7 +978,7 @@ void loop() {
 
   if (
     now - lastCloudPublish >=
-    cloudInterval
+      cloudInterval
   ) {
 
     lastCloudPublish = now;
