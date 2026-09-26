@@ -1,7 +1,4 @@
-#ifndef SECRETS_EXAMPLE_H
-#define SECRETS_EXAMPLE_H
+#pragma once
 
 #define AIO_USERNAME "YOUR_ADAFRUIT_USERNAME"
 #define AIO_KEY "YOUR_ADAFRUIT_IO_KEY"
-
-#endif
