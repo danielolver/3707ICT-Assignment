@@ -1,4 +1,4 @@
 #pragma once
 
 #define AIO_USERNAME "danielolver"
-#define AIO_KEY "YOUR_NEW_REAL_ADAFRUIT_IO_KEY"
+#define AIO_KEY "aio_doOn91TrGNG9P0r9NwmhsuQxGMfx"
