@@ -10,14 +10,14 @@ The system is designed so that **local automation continues even if Wi-Fi or Ada
 
 ## Simulated Components
 
-| Component           | Purpose                          | ESP32 Pin |
-| ------------------- | -------------------------------- | --------: |
-| DHT22               | Temperature and humidity sensing |   GPIO 15 |
-| PIR sensor          | Motion and occupancy detection   |   GPIO 27 |
-| Photoresistor / LDR | Ambient light sensing            |   GPIO 34 |
-| Yellow LED          | Simulated room lighting          |    GPIO 2 |
-| Relay module        | Simulated climate-control power  |   GPIO 26 |
-| Servo               | Simulated motorised blinds       |   GPIO 18 |
+| Component | Purpose | ESP32 Pin |
+| --- | --- | ---: |
+| DHT22 | Temperature and humidity sensing | GPIO 15 |
+| PIR sensor | Motion and occupancy detection | GPIO 27 |
+| Photoresistor / LDR | Ambient light sensing | GPIO 34 |
+| Yellow LED | Simulated room lighting | GPIO 2 |
+| Relay module | Simulated climate-control power | GPIO 26 |
+| Servo | Simulated motorised blinds | GPIO 18 |
 
 The relay represents whether the climate-control system is powered.
 
@@ -35,13 +35,15 @@ The current climate mode is displayed in the Serial Monitor and published to the
 
 The project supports PlatformIO and the Wokwi VS Code extension.
 
-The project includes:
+The public repository includes:
 
 * main ESP32 source code
-* `secrets.h`
+* `secrets.example.h`
 * `platformio.ini`
 * `wokwi.toml`
 * Wokwi circuit configuration
+
+The operational `secrets.h` file is stored locally and excluded from the public repository using `.gitignore` to prevent Adafruit IO credentials from being exposed.
 
 To run the project:
 
@@ -49,14 +51,17 @@ To run the project:
 2. Install the **Wokwi** extension.
 3. Open the project folder in VS Code.
 4. Select the `esp32dev` PlatformIO environment.
-5. Configure the Adafruit IO credentials in `secrets.h`.
-6. Build the project.
-7. Run **Wokwi: Start Simulator**.
-8. Open the Serial Monitor at **115200 baud**.
+5. Copy `secrets.example.h` and rename the copy to `secrets.h`.
+6. Replace the placeholder values in `secrets.h` with your Adafruit IO username and AIO key.
+7. Build the project.
+8. Run **Wokwi: Start Simulator**.
+9. Open the Serial Monitor at **115200 baud**.
+
+The `secrets.h` file should remain local and should not be committed to the public GitHub repository.
 
 The project must be built before starting Wokwi so the firmware files referenced by `wokwi.toml` are available.
 
-The simulated ESP32 connects to:
+The simulated ESP32 connects to the Wokwi virtual Wi-Fi network using:
 
 ```cpp
 const char* WIFI_SSID = "Wokwi-GUEST";
@@ -99,28 +104,40 @@ This is acceptable for the simulated Wokwi demonstration. A production implement
 
 # Adafruit IO Credentials
 
-Adafruit IO credentials are stored separately from the main source code in:
+Adafruit IO authentication requires an account username and AIO key.
+
+For security, operational credentials are stored locally in:
 
 ```text
 secrets.h
 ```
 
-Example:
+The `secrets.h` file is excluded from the public GitHub repository using `.gitignore`.
+
+A template file is provided in the repository:
+
+```text
+secrets.example.h
+```
+
+The template contains:
 
 ```cpp
 #pragma once
 
-const char* AIO_USERNAME = "YOUR_ADAFRUIT_USERNAME";
-const char* AIO_KEY = "YOUR_ADAFRUIT_IO_KEY";
+#define AIO_USERNAME "YOUR_ADAFRUIT_USERNAME"
+#define AIO_KEY "YOUR_ADAFRUIT_IO_KEY"
 ```
 
-The main source includes the file using:
+To configure the project, copy `secrets.example.h`, rename the copy to `secrets.h`, and replace the placeholder values with your own Adafruit IO credentials.
+
+The main application accesses the credentials using:
 
 ```cpp
 #include "secrets.h"
 ```
 
-The real Adafruit IO key should not be included in shared documentation. Placeholder credentials should be used when sharing the source code publicly.
+The operational `secrets.h` file should remain local and should not be committed to the public repository. This prevents the real Adafruit IO key from being exposed while still providing the required credential structure through `secrets.example.h`.
 
 ---
 
@@ -128,16 +145,16 @@ The real Adafruit IO key should not be included in shared documentation. Placeho
 
 The following Adafruit IO feeds are used. The feed keys must match exactly:
 
-| Feed Key          | Data                                   |
-| ----------------- | -------------------------------------- |
-| `temperature`     | Temperature in °C                      |
-| `humidity`        | Relative humidity                      |
-| `ambient-light`   | Ambient light level from 0–100%        |
-| `occupancy`       | `1` when occupied, `0` when unoccupied |
-| `room-light`      | `ON` or `OFF`                          |
-| `climate-mode`    | `HEATING`, `COOLING` or `OFF`          |
-| `blinds-position` | `OPEN` or `CLOSED`                     |
-| `system-status`   | Overall system/network status          |
+| Feed Key | Data |
+| --- | --- |
+| `temperature` | Temperature in °C |
+| `humidity` | Relative humidity |
+| `ambient-light` | Ambient light level from 0–100% |
+| `occupancy` | `1` when occupied, `0` when unoccupied |
+| `room-light` | `ON` or `OFF` |
+| `climate-mode` | `HEATING`, `COOLING` or `OFF` |
+| `blinds-position` | `OPEN` or `CLOSED` |
+| `system-status` | Overall system/network status |
 
 The Adafruit IO dashboard can use gauges and graphs for environmental sensor data and indicators or text blocks for occupancy, actuator states and system status.
 
@@ -313,12 +330,12 @@ Only remote Adafruit IO monitoring is affected.
 
 The system can report the following states:
 
-| Status          | Meaning                                    |
-| --------------- | ------------------------------------------ |
-| `ONLINE`        | Wi-Fi and MQTT are connected               |
-| `CLOUD OFFLINE` | Wi-Fi connected but MQTT unavailable       |
-| `LOCAL MODE`    | Wi-Fi unavailable                          |
-| `SENSOR FAULT`  | Invalid DHT22 temperature/humidity reading |
+| Status | Meaning |
+| --- | --- |
+| `ONLINE` | Wi-Fi and MQTT are connected |
+| `CLOUD OFFLINE` | Wi-Fi connected but MQTT unavailable |
+| `LOCAL MODE` | Wi-Fi unavailable |
+| `SENSOR FAULT` | Invalid DHT22 temperature/humidity reading |
 
 Wi-Fi connection attempts are retried every **10 seconds**.
 
@@ -366,25 +383,25 @@ The normal occupancy timeout is then:
 
 The demonstration video can show the major operating states and automation rules of the system.
 
-| Test                   | Simulated Inputs                      | Expected Result                                     |
-| ---------------------- | ------------------------------------- | --------------------------------------------------- |
-| Normal unoccupied room | 24°C, no motion, normal light         | Climate and room light remain off                   |
-| Unoccupied hot room    | 32°C, no motion                       | Climate remains off                                 |
-| Occupied hot room      | Motion + 32°C                         | Relay ON and mode `COOLING`                         |
-| Cooling hysteresis     | Reduce temperature to 29°C            | Cooling remains on                                  |
-| Cooling off            | Reduce temperature to 28°C            | Climate turns off                                   |
-| Occupied cold room     | Motion + 15°C                         | Relay ON and mode `HEATING`                         |
-| Heating hysteresis     | Raise temperature to 17°C             | Heating remains on                                  |
-| Heating off            | Raise temperature to 18°C             | Climate turns off                                   |
-| Occupied dark room     | Motion + light ≤35%                   | Yellow LED turns on                                 |
-| Lighting hysteresis    | Raise light to 40%                    | Light remains on                                    |
-| Bright room            | Raise light to ≥45%                   | Yellow LED turns off                                |
-| Warm and bright        | ≥27°C + ≥70% light                    | Servo closes blinds                                 |
-| Blind hysteresis       | Reduce light but keep above 50%       | Blinds remain closed                                |
-| Blind reopening        | Light ≤50% or temperature ≤25°C       | Servo opens blinds                                  |
-| Occupancy timeout      | No motion for 10 seconds in demo mode | Room becomes unoccupied; light and climate turn off |
-| MQTT unavailable       | Disconnect or prevent MQTT connection | Local automation continues                          |
-| DHT22 fault            | Invalid DHT22 reading                 | Climate disabled and status shows `SENSOR FAULT`    |
+| Test | Simulated Inputs | Expected Result |
+| --- | --- | --- |
+| Normal unoccupied room | 24°C, no motion, normal light | Climate and room light remain off |
+| Unoccupied hot room | 32°C, no motion | Climate remains off |
+| Occupied hot room | Motion + 32°C | Relay ON and mode `COOLING` |
+| Cooling hysteresis | Reduce temperature to 29°C | Cooling remains on |
+| Cooling off | Reduce temperature to 28°C | Climate turns off |
+| Occupied cold room | Motion + 15°C | Relay ON and mode `HEATING` |
+| Heating hysteresis | Raise temperature to 17°C | Heating remains on |
+| Heating off | Raise temperature to 18°C | Climate turns off |
+| Occupied dark room | Motion + light ≤35% | Yellow LED turns on |
+| Lighting hysteresis | Raise light to 40% | Light remains on |
+| Bright room | Raise light to ≥45% | Yellow LED turns off |
+| Warm and bright | ≥27°C + ≥70% light | Servo closes blinds |
+| Blind hysteresis | Reduce light but keep above 50% | Blinds remain closed |
+| Blind reopening | Light ≤50% or temperature ≤25°C | Servo opens blinds |
+| Occupancy timeout | No motion for 10 seconds in demo mode | Room becomes unoccupied; light and climate turn off |
+| MQTT unavailable | Disconnect or prevent MQTT connection | Local automation continues |
+| DHT22 fault | Invalid DHT22 reading | Climate disabled and status shows `SENSOR FAULT` |
 
 The demonstration should also show the Adafruit IO dashboard receiving live data over MQTT TLS and the Serial Monitor reporting the current system state.
 
@@ -442,9 +459,11 @@ The project includes several security considerations.
 
 ## Credential Protection
 
-Adafruit IO credentials are stored in `secrets.h` rather than being hard-coded directly into the main application source.
+Adafruit IO credentials are stored locally in `secrets.h` rather than being hard-coded directly into the main application source.
 
-Placeholder credentials should be used when the source code is shared publicly or included in documentation.
+The `secrets.h` file is excluded from Git version control using `.gitignore`, preventing operational Adafruit IO credentials from being exposed through the public repository.
+
+A `secrets.example.h` file containing placeholder values is included in the repository to demonstrate the required credential configuration without exposing real authentication information.
 
 ## MQTT Transport Security
 
@@ -490,7 +509,7 @@ The project demonstrates an ESP32-based smart-home IoT system with:
 * Wi-Fi connectivity.
 * MQTT over TLS using port 8883.
 * Adafruit IO dashboard integration.
-* Separate credential storage using `secrets.h`.
+* Secure credential separation using a Git-ignored `secrets.h` and public `secrets.example.h`.
 * Sensor-fault handling.
 * Automatic network reconnection.
 * Offline/local operation.
