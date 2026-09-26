@@ -1,4 +1,0 @@
-Adafruit IO Login Details
-
-username - danielolver
-password - sunjig-wuqVe2-wijbew
