@@ -35,7 +35,7 @@ The current climate mode is displayed in the Serial Monitor and published to the
 
 The project supports PlatformIO and the Wokwi VS Code extension.
 
-The public repository includes:
+The repository includes:
 
 * main ESP32 source code
 * `secrets.example.h`
@@ -43,7 +43,7 @@ The public repository includes:
 * `wokwi.toml`
 * Wokwi circuit configuration
 
-The operational `secrets.h` file is stored locally and excluded from the public repository using `.gitignore` to prevent Adafruit IO credentials from being exposed.
+The operational `secrets.h` file is stored locally and excluded from the repository using `.gitignore` to prevent Adafruit IO credentials from being exposed.
 
 To run the project:
 
@@ -57,7 +57,7 @@ To run the project:
 8. Run **Wokwi: Start Simulator**.
 9. Open the Serial Monitor at **115200 baud**.
 
-The `secrets.h` file should remain local and should not be committed to the public GitHub repository.
+The `secrets.h` file should remain local and should not be committed to the GitHub repository.
 
 The project must be built before starting Wokwi so the firmware files referenced by `wokwi.toml` are available.
 
@@ -112,7 +112,7 @@ For security, operational credentials are stored locally in:
 secrets.h
 ```
 
-The `secrets.h` file is excluded from the public GitHub repository using `.gitignore`.
+The `secrets.h` file is excluded from the GitHub repository using `.gitignore`.
 
 A template file is provided in the repository:
 
@@ -137,7 +137,7 @@ The main application accesses the credentials using:
 #include "secrets.h"
 ```
 
-The operational `secrets.h` file should remain local and should not be committed to the public repository. This prevents the real Adafruit IO key from being exposed while still providing the required credential structure through `secrets.example.h`.
+The operational `secrets.h` file should remain local and should not be committed to the GitHub repository. This prevents the real Adafruit IO key from being exposed while still providing the required credential structure through `secrets.example.h`.
 
 ---
 
@@ -461,7 +461,7 @@ The project includes several security considerations.
 
 Adafruit IO credentials are stored locally in `secrets.h` rather than being hard-coded directly into the main application source.
 
-The `secrets.h` file is excluded from Git version control using `.gitignore`, preventing operational Adafruit IO credentials from being exposed through the public repository.
+The `secrets.h` file is excluded from Git version control using `.gitignore`, preventing operational Adafruit IO credentials from being included in the current version of the repository.
 
 A `secrets.example.h` file containing placeholder values is included in the repository to demonstrate the required credential configuration without exposing real authentication information.
 
@@ -509,7 +509,7 @@ The project demonstrates an ESP32-based smart-home IoT system with:
 * Wi-Fi connectivity.
 * MQTT over TLS using port 8883.
 * Adafruit IO dashboard integration.
-* Secure credential separation using a Git-ignored `secrets.h` and public `secrets.example.h`.
+* Secure credential separation using a Git-ignored `secrets.h` and `secrets.example.h`.
 * Sensor-fault handling.
 * Automatic network reconnection.
 * Offline/local operation.
